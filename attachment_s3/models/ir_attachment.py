@@ -43,6 +43,13 @@ class IrAttachment(models.Model):
         l += super(IrAttachment, self)._get_stores()
         return l
 
+    def _get_s3_client(self):
+        """
+        Connect to S3 and return the S3 client.
+        """
+        params, aws_use_irsa = self._get_s3_connection_params()
+        return boto3.resource("s3", **params)
+
     @api.model
     def _get_s3_connection_params(self, bucket_name=None):
         host = os.environ.get('AWS_HOST')
@@ -55,12 +62,11 @@ class IrAttachment(models.Model):
         access_key = os.environ.get('AWS_ACCESS_KEY_ID')
         secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
         aws_use_irsa = os.environ.get('AWS_USE_IRSA')
-        bucket_name = bucket_name or os.environ.get('AWS_BUCKETNAME')
+        bucket_name = bucket_name or os.environ.get('AWS_BUCKETNAME', False)
         # replaces {db} by the database name to handle multi-tenancy
         bucket_name = bucket_name.format(db=self.env.cr.dbname)
-        params = {
-            'bucket_name': bucket_name,
-        }
+        params = {'bucket_name': bucket_name}
+
         if not aws_use_irsa and access_key:
             params['aws_access_key_id'] = access_key
             if secret_key:
@@ -69,7 +75,6 @@ class IrAttachment(models.Model):
             params['endpoint_url'] = host
         if region_name:
             params['region_name'] = region_name
-
         return params, aws_use_irsa
 
     @api.model
@@ -81,11 +86,15 @@ class IrAttachment(models.Model):
         * ``AWS_REGION``
         * ``AWS_ACCESS_KEY_ID``
         * ``AWS_SECRET_ACCESS_KEY``
+        * ``AWS_DELETE_ON_DBDROP``
         * ``AWS_BUCKETNAME``
         * ``AWS_USE_IRSA``
 
         If a name is provided, we'll read this bucket, otherwise, the bucket
         from the environment variable ``AWS_BUCKETNAME`` will be read.
+
+        If AWS_DELETE_ON_DBDROP is set to True, the bucket will be
+        deleted when the db is dropped.
 
         """
         params, aws_use_irsa = self._get_s3_connection_params(bucket_name=name)
@@ -110,7 +119,6 @@ class IrAttachment(models.Model):
                     'Optionally, the S3 host can be changed with:\n'
                     '* AWS_HOST\n'
                     ) % (bucket_name, bucket_name)
-
             raise exceptions.UserError(msg)
         # try:
         # get instanciated bucket from bucket_dict
