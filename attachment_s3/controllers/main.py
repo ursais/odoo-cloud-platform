@@ -52,7 +52,7 @@ class Database(Database):
 
             return response
         except exceptions.UserError:
-            _logger.exception("Error reading attachments from object storage.")
+            _logger.exception("Error writing attachments to object storage.")
             return response
 
     @http.route()
@@ -66,5 +66,5 @@ class Database(Database):
             request.env["ir.attachment"].force_storage()
             return response
         except exceptions.UserError:
-            _logger.exception("Error reading attachments from object storage.")
+            _logger.exception("Error writing attachments to object storage.")
             return response
