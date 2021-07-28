@@ -54,3 +54,17 @@ class Database(Database):
         except exceptions.UserError:
             _logger.exception("Error reading attachments from object storage.")
             return response
+
+    @http.route()
+    def restore(self, master_pwd, backup_file, name, copy=False):
+        response = super(Database, self).restore(master_pwd, backup_file, name, copy)
+        try:
+            request.env["ir.attachment"]._get_s3_bucket(name)
+            request.env["ir.config_parameter"].create(
+                {"key": "ir_attachment.location", "value": "s3"}
+            )
+            request.env["ir.attachment"].force_storage()
+            return response
+        except exceptions.UserError:
+            _logger.exception("Error reading attachments from object storage.")
+            return response
