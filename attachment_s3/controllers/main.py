@@ -66,10 +66,10 @@ class Database(Database):
         try:
             new_bucket_name = os.environ.get("AWS_BUCKETNAME").format(db=name)
             request.env["ir.attachment"]._get_s3_bucket(new_bucket_name)
-            request.env["ir.config_parameter"].create(
+            request.env["ir.config_parameter"].sudo().create(
                 {"key": "ir_attachment.location", "value": "s3"}
             )
-            request.env["ir.attachment"].force_storage()
+            request.env["ir.attachment"].sudo().force_storage()
         except exceptions.UserError:
             _logger.exception("Error writing attachments to object storage.")
         return res
