@@ -23,6 +23,18 @@ except ImportError:
     _logger.debug("Cannot 'import boto3'.")
 
 
+class S3BucketClientRegistry(object):
+    bucket_dict = {}
+
+    @classmethod
+    def get_bucket_client(cls, bucket_name):
+        return cls.bucket_dict.get(bucket_name)
+
+    @classmethod
+    def set_bucket_client(cls, bucket_name, bucket_obj):
+        cls.bucket_dict[bucket_name] = bucket_obj
+
+
 class IrAttachment(models.Model):
     _inherit = "ir.attachment"
 
@@ -88,7 +100,6 @@ class IrAttachment(models.Model):
 
         If AWS_DELETE_ON_DBDROP is set to True, the bucket will be
         deleted when the db is dropped.
-
         """
         s3, region_name = self._get_s3_client()
 
@@ -112,6 +123,7 @@ class IrAttachment(models.Model):
             raise exceptions.UserError(str(error))
 
         if not exists:
+            region_name = params.get('region_name')
             if not region_name:
                 bucket = s3.create_bucket(Bucket=bucket_name)
             else:
@@ -120,6 +132,8 @@ class IrAttachment(models.Model):
                     CreateBucketConfiguration={
                         'LocationConstraint': region_name
                     })
+        # store instanciated bucket to bucket_dict
+        S3BucketClientRegistry.set_bucket_client(bucket_name, bucket)
         return bucket
 
     @api.model
