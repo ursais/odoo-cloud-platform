@@ -43,31 +43,45 @@ class IrAttachment(models.Model):
         l += super(IrAttachment, self)._get_stores()
         return l
 
-    @api.model
-    def _get_s3_connection_params(self, bucket_name=None):
-        host = os.environ.get('AWS_HOST')
+    def _get_s3_client(self):
+        """
+        Connect to S3 and return the S3 client.
+        """
+        host = os.environ.get("AWS_HOST")
 
         # Ensure host is prefixed with a scheme (use https as default)
         if host and not urlsplit(host).scheme:
-            host = 'https://%s' % host
+            host = "https://%s" % host
 
-        region_name = os.environ.get('AWS_REGION')
-        access_key = os.environ.get('AWS_ACCESS_KEY_ID')
-        secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
-        bucket_name = bucket_name or os.environ.get('AWS_BUCKETNAME')
-        # replaces {db} by the database name to handle multi-tenancy
-        bucket_name = bucket_name.format(db=self.env.cr.dbname)
+        region_name = os.environ.get("AWS_REGION")
+        access_key = os.environ.get("AWS_ACCESS_KEY_ID")
+        secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+        delete_on_drop = os.environ.get("AWS_DELETE_ON_DBDROP")
+
         params = {
-            'aws_access_key_id': access_key,
-            'aws_secret_access_key': secret_key,
-            'bucket_name': bucket_name,
+            "aws_access_key_id": access_key,
+            "aws_secret_access_key": secret_key,
         }
         if host:
-            params['endpoint_url'] = host
+            params["endpoint_url"] = host
         if region_name:
-            params['region_name'] = region_name
+            params["region_name"] = region_name
+        if not (access_key and secret_key):
+            msg = _(
+                "If you want to read from the S3 bucket, the following "
+                "environment variables must be set:\n"
+                "* AWS_ACCESS_KEY_ID\n"
+                "* AWS_SECRET_ACCESS_KEY\n"
+                "If you want to write in the S3 bucket, this variable "
+                "must be set as well:\n"
+                "* AWS_BUCKETNAME\n"
+                "Optionally, the S3 host can be changed with:\n"
+                "* AWS_HOST\n"
+            )
 
-        return params
+            raise exceptions.UserError(msg)
+        # try:
+        return boto3.resource("s3", **params), region_name
 
     @api.model
     def _get_s3_bucket(self, name=None):
@@ -78,39 +92,21 @@ class IrAttachment(models.Model):
         * ``AWS_REGION``
         * ``AWS_ACCESS_KEY_ID``
         * ``AWS_SECRET_ACCESS_KEY``
+        * ``AWS_DELETE_ON_DBDROP``
         * ``AWS_BUCKETNAME``
 
         If a name is provided, we'll read this bucket, otherwise, the bucket
         from the environment variable ``AWS_BUCKETNAME`` will be read.
 
+        If AWS_DELETE_ON_DBDROP is set to True, the bucket will be
+        deleted when the db is dropped.
         """
-        params = self._get_s3_connection_params(bucket_name=name)
-        # Pop the bucket_name to avoid TypeError: resource() got an unexpected
-        #  keyword argument 'bucket_name'
-        bucket_name = params.pop("bucket_name")
-        if not (
-            params["aws_access_key_id"] and
-            params["aws_secret_access_key"] and
-            bucket_name
-        ):
-            msg = _('If you want to read from the %s S3 bucket, the following '
-                    'environment variables must be set:\n'
-                    '* AWS_ACCESS_KEY_ID\n'
-                    '* AWS_SECRET_ACCESS_KEY\n'
-                    'If you want to write in the %s S3 bucket, this variable '
-                    'must be set as well:\n'
-                    '* AWS_BUCKETNAME\n'
-                    'Optionally, the S3 host can be changed with:\n'
-                    '* AWS_HOST\n'
-                    ) % (bucket_name, bucket_name)
+        s3, region_name = self._get_s3_client()
 
-            raise exceptions.UserError(msg)
-        # try:
-        # get instanciated bucket from bucket_dict
-        bucket = S3BucketClientRegistry.get_bucket_client(bucket_name)
-        if bucket:
-            return bucket
-        s3 = boto3.resource('s3', **params)
+        bucket_name = name or os.environ.get("AWS_BUCKETNAME")
+        # replaces {db} by the database name to handle multi-tenancy
+        bucket_name = bucket_name.format(db=self.env.cr.dbname)
+
         bucket = s3.Bucket(bucket_name)
         exists = True
         try:
