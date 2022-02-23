@@ -122,8 +122,6 @@ class IrAttachment(models.Model):
                     CreateBucketConfiguration={
                         'LocationConstraint': region_name
                     })
-        # store instanciated bucket to bucket_dict
-        S3BucketClientRegistry.set_bucket_client(bucket_name, bucket)
         return bucket
 
     @api.model
