@@ -23,12 +23,24 @@ except ImportError:
     _logger.debug("Cannot 'import boto3'.")
 
 
+class S3BucketClientRegistry(object):
+    bucket_dict = {}
+
+    @classmethod
+    def get_bucket_client(cls, bucket_name):
+        return cls.bucket_dict.get(bucket_name)
+
+    @classmethod
+    def set_bucket_client(cls, bucket_name, bucket_obj):
+        cls.bucket_dict[bucket_name] = bucket_obj
+
+
 class IrAttachment(models.Model):
     _inherit = "ir.attachment"
 
     def _get_stores(self):
-        l = ["s3"]
-        l += super()._get_stores()
+        l = ['s3']
+        l += super(IrAttachment, self)._get_stores()
         return l
 
     def _get_s3_client(self):
@@ -44,6 +56,7 @@ class IrAttachment(models.Model):
         region_name = os.environ.get("AWS_REGION")
         access_key = os.environ.get("AWS_ACCESS_KEY_ID")
         secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+        delete_on_drop = os.environ.get("AWS_DELETE_ON_DBDROP")
 
         params = {
             "aws_access_key_id": access_key,
@@ -65,6 +78,7 @@ class IrAttachment(models.Model):
                 "Optionally, the S3 host can be changed with:\n"
                 "* AWS_HOST\n"
             )
+
             raise exceptions.UserError(msg)
         # try:
         return boto3.resource("s3", **params), region_name
@@ -72,25 +86,17 @@ class IrAttachment(models.Model):
     @api.model
     def _get_s3_bucket(self, name=None):
         """Connect to S3 and return the bucket
-
         The following environment variables can be set:
         * ``AWS_HOST``
         * ``AWS_REGION``
         * ``AWS_ACCESS_KEY_ID``
         * ``AWS_SECRET_ACCESS_KEY``
+        * ``AWS_DELETE_ON_DBDROP``
         * ``AWS_BUCKETNAME``
-        * ``AWS_DUPLICATE``
-        * ``AWS_EMPTY_ON_DBDROP``
-
         If a name is provided, we'll read this bucket, otherwise, the bucket
         from the environment variable ``AWS_BUCKETNAME`` will be read.
-
-        If AWS_DUPLICATE is set, the bucket and all its objects will be copied when the
-        db is duplicated. The paths in the database will be updated to use the copy.
-
-        If AWS_EMPTY_ON_DBDROP is set, the objects will be deleted when the db is
-        dropped, but the bucket will be kept.
-
+        If AWS_DELETE_ON_DBDROP is set to True, the bucket will be
+        deleted when the db is dropped.
         """
         s3, region_name = self._get_s3_client()
 
@@ -122,6 +128,8 @@ class IrAttachment(models.Model):
                     CreateBucketConfiguration={
                         'LocationConstraint': region_name
                     })
+        # store instanciated bucket to bucket_dict
+        S3BucketClientRegistry.set_bucket_client(bucket_name, bucket)
         return bucket
 
     @api.model
