@@ -62,6 +62,7 @@ class IrAttachment(models.Model):
             "aws_access_key_id": access_key,
             "aws_secret_access_key": secret_key,
         }
+
         if host:
             params["endpoint_url"] = host
         if region_name:
@@ -103,7 +104,6 @@ class IrAttachment(models.Model):
         bucket_name = name or os.environ.get("AWS_BUCKETNAME")
         # replaces {db} by the database name to handle multi-tenancy
         bucket_name = bucket_name.format(db=self.env.cr.dbname)
-
         bucket = s3.Bucket(bucket_name)
         exists = True
         try:

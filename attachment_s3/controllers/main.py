@@ -48,10 +48,7 @@ class Database(Database):
                         SELECT id, REPLACE(store_fname, '%s', '%s')
                         AS store_fname FROM ir_attachment WHERE db_datas is NULL
                     ) AS s(id,store_fname) where t.id = s.id;
-                """ % (
-                    bucket_to_copy,
-                    new_bucket_name,
-                )
+                """ % (bucket_to_copy, new_bucket_name)
                 registry = odoo.modules.registry.Registry.new(new_name)
                 with registry.cursor() as cr:
                     env = odoo.api.Environment(cr, SUPERUSER_ID, {})
