@@ -7,8 +7,7 @@ import logging
 import werkzeug
 
 from odoo import http
-
-from odoo.addons.web.controllers.main import ensure_db
+from odoo.addons.web.controllers.utils import ensure_db
 
 
 class HealthCheckFilter(logging.Filter):
