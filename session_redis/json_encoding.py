@@ -1,4 +1,4 @@
-# Copyright 2016-2020 Camptocamp SA
+# Copyright 2016-2024 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import json
@@ -27,7 +27,7 @@ class SessionDecoder(json.JSONDecoder):
     """Decode json, recomposing recordsets and date/datetime"""
 
     def __init__(self, *args, **kwargs):
-        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+        super().__init__(*args, object_hook=self.object_hook, **kwargs)
 
     def object_hook(self, obj):
         if "_type" not in obj:

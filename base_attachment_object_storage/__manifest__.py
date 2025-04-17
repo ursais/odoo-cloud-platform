@@ -12,6 +12,6 @@
     "depends": ["base"],
     "website": "https://github.com/camptocamp/odoo-cloud-platform",
     "data": ["data/res_config_settings_data.xml"],
-    "installable": True,
+    "installable": False,
     "auto_install": True,
 }
