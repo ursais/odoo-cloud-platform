@@ -1,10 +1,10 @@
 # Copyright 2016-2021 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+from prometheus_client import Counter, Summary
+
 from odoo import models
 from odoo.http import request
-from prometheus_client import Summary, Counter
-
 
 REQUEST_TIME = Summary(
     "request_latency_sec", "Request response time in sec", ["query_type"]
@@ -17,6 +17,8 @@ class IrHttp(models.AbstractModel):
 
     @classmethod
     def _dispatch(cls, endpoint):
+        # httprequest environment is updated with WSGI environment variables in core
+        # REF: https://github.com/odoo/odoo/blob/16.0/addons/http_routing/models/ir_http.py#L529
         path_info = request.httprequest.environ.get("PATH_INFO")
 
         if path_info.startswith("/longpolling/"):

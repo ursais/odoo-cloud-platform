@@ -5,16 +5,16 @@ import inspect
 import logging
 import os
 import time
-from .strtobool import strtobool
+from contextlib import closing, contextmanager
 
 import psycopg2
-import odoo
 
-from contextlib import closing, contextmanager
-from odoo import api, exceptions, models, _
+import odoo
+from odoo import _, api, exceptions, models
 from odoo.osv.expression import AND, OR, normalize_domain
 from odoo.tools.safe_eval import const_eval
 
+from .strtobool import strtobool
 
 _logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def clean_fs(files):
                 _logger.info(
                     "_file_delete could not unlink %s", full_path, exc_info=True
                 )
-            except IOError:
+            except OSError:
                 # Harmless and needed for race conditions
                 _logger.info(
                     "_file_delete could not unlink %s", full_path, exc_info=True
@@ -124,7 +124,7 @@ class IrAttachment(models.Model):
         domain = []
         storage_config = self._get_storage_force_db_config()
         for mimetype_key, limit in storage_config.items():
-            part = [("mimetype", "=like", "{}%".format(mimetype_key))]
+            part = [("mimetype", "=like", f"{mimetype_key}%")]
             if limit:
                 part = AND([part, [("file_size", "<=", limit)]])
             domain = OR([domain, part])
@@ -236,20 +236,20 @@ class IrAttachment(models.Model):
             # using SQL to include files hidden through unlink or due to record
             # rules
             cr.execute(
-                "SELECT COUNT(*) FROM ir_attachment " "WHERE store_fname = %s", (fname,)
+                "SELECT COUNT(*) FROM ir_attachment WHERE store_fname = %s", (fname,)
             )
             count = cr.fetchone()[0]
             if not count:
                 self._store_file_delete(fname)
         else:
-            super()._file_delete(fname)
+            return super()._file_delete(fname)
 
     @api.model
     def _is_file_from_a_store(self, fname):
         for store_name in self._get_stores():
             if self.is_storage_disabled(store_name):
                 continue
-            uri = "{}://".format(store_name)
+            uri = f"{store_name}://"
             if fname.startswith(uri):
                 return True
         return False
@@ -340,7 +340,7 @@ class IrAttachment(models.Model):
             (
                 normalize_domain(
                     [
-                        ("store_fname", "=like", "{}://%".format(storage)),
+                        ("store_fname", "=like", f"{storage}://%"),
                         # for res_field, see comment in
                         # _force_storage_to_object_storage
                         "|",
@@ -360,7 +360,7 @@ class IrAttachment(models.Model):
             total = len(attachment_ids)
             start_time = time.time()
             _logger.info(
-                "Moving %d attachments from %s to" " DB for fast access", total, storage
+                "Moving %d attachments from %s to DB for fast access", total, storage
             )
             current = 0
             for attachment_id in attachment_ids:
@@ -395,10 +395,11 @@ class IrAttachment(models.Model):
         # is required! It's because of an override of _search in ir.attachment
         # which adds ('res_field', '=', False) when the domain does not
         # contain 'res_field'.
-        # https://github.com/odoo/odoo/blob/9032617120138848c63b3cfa5d1913c5e5ad76db/odoo/addons/base/ir/ir_attachment.py#L344-L347
+        # https://github.com/odoo/odoo/blob/9032617120138848c63b3cfa5d1913c5e5ad76db/odoo/addons/base/ir/ir_attachment.py#L344-L347  # noqa: B950
+
         domain = [
             "!",
-            ("store_fname", "=like", "{}://%".format(storage)),
+            ("store_fname", "=like", f"{storage}://%"),
             "|",
             ("res_field", "=", False),
             ("res_field", "!=", False),
